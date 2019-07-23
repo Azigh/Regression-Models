@@ -1,0 +1,171 @@
+---
+title: "Final Projecct - Regression Model Analysis (mtcars)"
+date: "July 23, 2019"
+output:
+  pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Synopsis (Executive Summary)
+In this project we work on the `mtcars` data set and we want to explore how miles per gallon (MPG) as the outcome variable is affected by different variables, specifically evaluate the effect of automatic and manual transmissions on dependent variable MPG. The following two questions will be answered in this project:
+
+- Is an automatic or manual transmission better for MPG?
+
+- Quantify the MPG difference between automatic and manual transmissions.
+
+## Loading data and setting up environment
+
+```{r, message=FALSE}
+library(datasets)
+data(mtcars)
+library(ggplot2)
+
+```
+
+
+## Describing variables in data
+The data of this project are extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles. This means that the data consists of 32 observations on 11 variables.
+
+- **mpg**:	 Miles/(US) gallon
+- **cyl**:	 Number of cylinders
+- **disp**:	 Displacement (cu.in.)
+- **hp**:	 Gross horsepower
+- **drat**:	 Rear axle ratio
+- **wt**:	 Weight (lb/1000)
+- **qsec**:	 1/4 mile time
+- **vs**:	 V/S
+- **am**:	 Transmission (0 = automatic, 1 = manual)
+- **gear**:	 Number of forward gears
+- **carb**:	 Number of carburetors
+
+## Viewing Data Structure
+
+Viewing structure of variables in "mtcars" data:
+
+```{r}
+dim(mtcars)  ## 32 observations and 11 variables
+head(mtcars) ## some observations to better understand mtcars 
+str(mtcars) ## variable types after coersion
+```
+
+## Data Processing
+
+Changing categorical variables to factors, and relabeling `am` variables to `Automatic` and `Manual` for more clearancy.
+
+```{r}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$am <- factor(mtcars$am, labels = c("Automatic","Manual"))
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+```
+
+## Visualizations
+
+Plotting the miles per gallon (MPG) for automatic and manual transmissions.
+
+```{r, fig.height= 4}
+plot1 <- ggplot(mtcars, aes(x=am, y=mpg)) +
+    geom_boxplot(aes(fill = am)) +
+    xlab("Transmission") +
+    ylab("MPG") 
+plot1
+```
+## Analysis
+
+It looks like there is a definite difference in the type of transmission for MPG. Performing a t-test will help verify if the difference in means is significant.
+
+```{r}
+auto_vs_manu_ttest <- t.test(mpg ~ am, mtcars)
+auto_vs_manu_ttest
+```
+
+The t-test rejected the null-hypothesis that the difference in means is equal to zero, with a p-value of $.0014$. Therefore there is a difference in transmission type, with manual transmissions having a higher MPG.
+
+## Models of Regression Analysis
+
+Since the project is trying to quantify the difference in MPG for automatic and manual transmissions. The best starting place is a simple linear model with transmission
+type as the dependent variable.
+
+### Model 1: Fitting model with just one variable (simple model):
+```{r}
+basic_fit <- lm(mpg ~ am, mtcars)
+summary(basic_fit)$coefficients
+
+summary(basic_fit)$r.squared
+```
+
+The basic linear model with `am` as the only regressor explains $36\%$ of the variation, not a very good model. To find a model which captures more variance (better R-Squared), while significant p-values, we need to add more than just one variable to the model. However, this could be tricky too! Since the regressors can correlate with not only the predictor, but also the other regresors. 
+
+```{r}
+pairs(mtcars, panel = panel.smooth, main = "MTCARS PAIRS GRAPHS")
+```
+As he graph shows that MPG has correlations with other variables than just am. To obtain a more accurate model, we need predicting MPG in correlation with other variables than am. Lets use some models to evaluate the correlations.
+
+### Model 2: Fitting model using all the variables (general model-fitting all variables):
+
+We use all variables in mtcars data to fit a general model to see R-Squared and P-Values for all variables in this case:
+
+```{r}
+fitall <- lm(mpg ~ ., mtcars) 
+
+summary(fitall )$coefficients
+summary(fitall)$r.squared
+
+```
+As the sumamry of the fittall model shows: R-Squared value has improved about $80\%$, but is not able to describe the remaining variance of the MPG variable. On the other hand as the p-values show in the summary, there is no coefficient signifinact at $0.05$ level. SO that we can not get a relaible conclusion about this model and its coefficients, too. Therefore, we have too search more and find a better model in between of these two models.
+
+### Model 3: Using STEP function in R
+
+In order to do variable selection we use R-function STEP, to do variable selection.
+
+```{r}
+everything_fit <- lm(mpg ~ ., mtcars)
+step_fit <- step(fitall,direction="both",trace=FALSE)
+summary(step_fit)$coefficients
+summary(step_fit)$r.squared
+```
+As the coeffs summary shows, the p-value column does not show significancy for coefficients in all considered variables. SO that we may want to find a better model with significant p-values, while keeping the high adjusted R-squared value in new model!
+
+### Model 4: Last Model Examination
+
+Looking at the p-values and standard error for all variables given in general model (model 2), we decide to evaluate the following model and see the significance of p-value and R-squared in this model:
+
+```{r}
+lastModel <- lm(mpg ~ wt + qsec + am, data = mtcars)
+summary(lastModel)$coefficients
+summary(lastModel)$r.squared 
+```
+
+As the summary of the model shows, the p-values corresponding to all the coefficients show significant at level of $0.05$. Moreover, the adjusted r-squared covers good amount of variability in the model which is about $85\%$.
+
+## Residual Analysis:
+
+Everything so far looks solid, but lets make sure this model fits our data well by printing the diagnostic plots.
+
+```{r}
+par(mfrow = c(2,2))
+plot(lastModel, col = "blue", lwd = 2)
+```
+
+The summary of the above diagnostic plots demonstrates the following:
+- Residuals vs Fitted: The points are randomly scattered, but may have a slight non-linear relationship.
+- Normal Q-Q: The points pass normality, they deviate slightly from the diagonal, but they follow the diagonal fairly close.
+- Scale-Location: The upward slope line is worrisome, the residues spread slightly wider.
+- Residuals vs Leverage: No high leverage points.
+
+### Conclusion:
+
+Our first exploratory data analysis plot (using box plot), along with running t-test to confirm our observation, all all show that best transmission type for MPG would have to be the manual transmission. The summary results in our last model, demonstrates that by having a manual transmission instead of an automatic the MPG will increase by 2.94 as can be seen in the best model's `amManual` coefficient. The model fit well with a $p < 0.05$ and and $R^2 = 0.85$.
+
+The diagnostic plots on the other hand show us that something may be missing in our model. I believe the true cause for these trends are do to the small sample size with little overlap on the parameters `wt` and `qsec`.
+
+
+
+
+
+
